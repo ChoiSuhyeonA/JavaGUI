@@ -1,0 +1,314 @@
+package 기말프로젝트;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.ItemEvent;
+import java.awt.event.ItemListener;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Vector;
+
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTabbedPane;
+import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.table.DefaultTableModel;
+
+import 기말프로젝트.Border.EditPanel;
+
+public class Border extends JFrame {
+
+	public JPanel basePanel[] = new JPanel[10];
+	public static JPanel selectPanel[] = new JPanel[10];
+	
+	public JTextArea resultTA = new JTextArea(10, 20);
+	public JTextField resultTF = new JTextField(20);
+	public static Vector rowData = null;
+	public static String header[] = {"대기번호", "메뉴", "갯수", "가격" }; //1.number,2.menu,3.choose,4.price
+	public static DefaultTableModel model = new DefaultTableModel(header, 0);
+	public static JTable table = new JTable(model);
+	public static Statement stmt;
+	public static ResultSet rs = null;
+	public static PreparedStatement pstmt;
+	String url = "jdbc:mysql://localhost:3306/Term?characterEncoding=UTF-8&serverTimezone=UTC";
+	String ID = "root";
+	String password = "1137";
+	public static java.sql.Connection con = null;
+	
+
+	public Border() {
+		JTabbedPane tab = new JTabbedPane(JTabbedPane.TOP);
+		basePanel[0] = new JPanel(new BorderLayout()); // 위패널
+		basePanel[1] = new JPanel(new BorderLayout()); // 아래패널
+		basePanel[2] = new JPanel(new GridLayout(0, 1)); // 전체틀
+		basePanel[3] = new JPanel(); // 음식 패널
+
+		selectPanel[0] = new WelcomePanel();
+		selectPanel[1] = new MenuPanel();
+		selectPanel[2] = new EditPanel();
+
+		basePanel[0].add(selectPanel[0], BorderLayout.NORTH);// WelcomePanel 위로지정
+		basePanel[0].add(selectPanel[1], BorderLayout.WEST); // MenuPanel 왼쪽으로 지정
+		basePanel[0].add(selectPanel[2], BorderLayout.CENTER);// EditPanel 가운데로 지정
+
+		
+		basePanel[1].add(new JScrollPane(table), BorderLayout.CENTER);
+		basePanel[1].add(resultTF, BorderLayout.SOUTH);
+
+		basePanel[2].add(basePanel[0]);
+		basePanel[2].add(basePanel[1]);
+
+		this.add(basePanel[2]);
+
+		tab.add("Drink", basePanel[2]);
+		tab.add("Food", basePanel[3]);
+
+		this.add(tab);
+		this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		this.setTitle("Java Term Project");
+		this.setSize(650, 500);
+		this.setVisible(true);
+		
+		//데이터베이스 연결
+		//데이터베이스:Term, 테이블: menu
+		//(number,drink,choose,price) 
+		
+		try {
+			Class.forName("com.mysql.cj.jdbc.Driver");
+			System.out.println("JDBC 연결 성공");
+			try {
+				con = DriverManager.getConnection(url, ID, password);
+				System.out.println("DB 연결 성공");
+			} catch (SQLException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+		} catch (ClassNotFoundException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+			System.out.println("JDBS 연결 실패");
+		}
+		try {
+			stmt = con.createStatement();
+			rs = stmt.executeQuery("select * from menu ");
+			System.out.println("데이터베이스 테이블 연결");
+		} catch (SQLException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+			System.out.println("Statement 생성 오류");
+		}
+	}
+
+	class WelcomePanel extends JPanel {
+		public JLabel msgLB = new JLabel();
+
+		public WelcomePanel() {
+			msgLB.setText("Vending machine");
+			this.add(msgLB);
+		}
+	}
+
+	class MenuPanel extends JPanel implements ItemListener {
+		public String[] menuName = { "콜라 ", "사이다 ", "밀키스 ", "아메리카노 ", "카페라떼 ", "파워에이드 ", "봉봉 ", "물 ", "하늘보리" };
+		String menuImage[] = { "image/cola.jpg", "image/cider.jpg", "image/milkis.jpg", "image/americano.jpg",
+				"image/cafferatte.jpg", "image/powerade.jpg", "image/bongbong.jpg", "image/water.jpg",
+				"image/bori.jpg" };
+		public ImageIcon image[] = new ImageIcon[menuName.length];
+		public JCheckBox[] menuCB = new JCheckBox[menuName.length];
+		public int subTotal = 0;
+		public int costOfDrink[] = { 2000, 1500, 1800, 1500, 1600, 1700, 1000, 500, 1100 };
+
+		public MenuPanel() {
+			this.setLayout(new GridLayout(3, 3)); // MenuPanel (3,3)으로 그리드레이아웃 지정
+			for (int i = 0; i < menuName.length; i++) {
+				image[i] = new ImageIcon(menuImage[i]);
+				menuCB[i] = new JCheckBox(menuName[i], image[i]);
+				menuCB[i].setBorderPainted(true); // 체크박스 경계선
+				menuCB[i].addItemListener(this);
+				this.add(menuCB[i]);
+			}
+
+		}
+
+		public void resetMenu() {
+			for (int i = 0; i < menuCB.length; i++) {
+				menuCB[i].setSelected(false);
+			}
+		}
+
+		public int calcDrinkSelect() {
+			int textGet = Integer.parseInt(((EditPanel) selectPanel[2]).countTf.getText());
+			for (int i = 0; i < costOfDrink.length; i++) {
+				if (menuCB[i].isSelected())
+					
+					subTotal += textGet*costOfDrink[i];
+			}
+			return subTotal;
+
+		}
+
+		@Override
+		public void itemStateChanged(ItemEvent e) {
+			// TODO Auto-generated method stub
+
+		}
+
+	}
+
+	static class EditPanel extends JPanel {
+		public JButton countBt = new JButton("확인");
+		public JButton resetBt = new JButton("초기화");
+		public JButton signBt = new JButton("결재");
+		public JButton deleteBt = new JButton("삭제");
+		public JLabel countLb = new JLabel("구매갯수");
+		public JTextField countTf = new JTextField(5);
+		public JTextArea countTa = new JTextArea(5, 5);
+		public JPanel edit = new JPanel();
+		public int number=0; //데이터베이스 테이블 대기번호 숫자
+		public int subChoose =0; //데이터베이스 테이블 총선택갯수
+		public String subChooseName=("(menu)");//데이터베이스 테이블 총선택메뉴
+	
+		
+		public EditPanel() {
+			this.setLayout(new GridLayout(0, 2));
+
+			countTa.setText("결재대기");
+			edit.add(countLb);
+			edit.add(countTf);
+			edit.add(countBt);
+			edit.add(resetBt);
+			edit.add(signBt);
+			edit.add(deleteBt);
+		
+			countBt.addActionListener(new ActionListener() {
+				public void actionPerformed(ActionEvent e) {
+
+					// TODO Auto-generated method stub
+					if (e.getSource() == countBt) {
+						JButton btn_obj = (JButton) e.getSource();
+		
+						for (int i = 0; i < ((MenuPanel) selectPanel[1]).costOfDrink.length; i++) {
+
+							if (((MenuPanel) selectPanel[1]).menuCB[i].isSelected()) {
+
+								((EditPanel) selectPanel[2]).countTa
+										.append("\n" + ((MenuPanel) selectPanel[1]).menuName[i]);
+
+								((EditPanel) selectPanel[2]).countTa
+										.append("\n" + countTf.getText() + "개 선택됐습니다" + "\n" + "총합금액:" + (((MenuPanel) selectPanel[1]).calcDrinkSelect()));   
+								subChoose += Integer.parseInt(countTf.getText());
+								subChooseName +="  "+(((MenuPanel) selectPanel[1]).menuName[i]);
+								((MenuPanel) selectPanel[1]).resetMenu();
+
+							}
+
+						}
+
+					}
+
+				}
+
+				private String totalSum() {
+					// TODO Auto-generated method stub
+					return null;
+				}
+			}); //등록버튼 (클릭시 물건 등록)
+			resetBt.addActionListener(new ActionListener() {
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					// TODO Auto-generated method stub
+					if(e.getSource()==resetBt) {
+						((MenuPanel) selectPanel[1]).subTotal=0;
+						((EditPanel) selectPanel[2]).countTa.setText("");
+						((EditPanel) selectPanel[2]).countTf.setText("");
+						((EditPanel)selectPanel[2]).subChoose =0;
+						((EditPanel)selectPanel[2]).subChooseName ="(menu)";
+					}
+				}
+				
+			}); //초기화버튼 리스너 (지금까지 등록된 내용삭제)
+			deleteBt.addActionListener(new ActionListener() {
+
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					// TODO Auto-generated method stub
+					if (table.isFocusable()) {
+						int index = table.getSelectedRow();
+						System.out.println("Delete 성공");
+						model.removeRow(index);
+					}
+				}
+				
+			});// 삭제버튼
+			signBt.addActionListener(new ActionListener() {
+				public void actionPerformed(ActionEvent e) {
+					// TODO Auto-generated method stub
+					if (e.getSource() == ((EditPanel) selectPanel[2]).signBt) {
+						try {
+							
+							String sql = "insert into menu (number,drink,choose,price) values(?,?,?,?)";
+								pstmt = con.prepareStatement(sql);
+								number += 1; 
+								String drink =((EditPanel)selectPanel[2]).subChooseName;
+								int choose = ((EditPanel)selectPanel[2]).subChoose;
+								int price =((MenuPanel)selectPanel[1]).subTotal;
+								pstmt.setInt(1, number);
+								pstmt.setString(2, drink);
+								pstmt.setInt(3, choose); 
+								pstmt.setInt(4, price); 
+								pstmt.executeUpdate();
+								
+								System.out.println("Insert 성공");
+								stmt = con.createStatement();
+								rs = stmt.executeQuery("select * from menu");
+								
+								rowData = new Vector();
+								rowData.addElement(Integer.toString(number));
+								rowData.addElement(drink);
+								rowData.addElement(Integer.toString(choose));
+								rowData.addElement(Integer.toString(price));
+								model.addRow(rowData);
+								
+								//결재후 초기화를 해준다
+								((MenuPanel) selectPanel[1]).subTotal=0;
+								((EditPanel) selectPanel[2]).countTa.setText("");
+								((EditPanel) selectPanel[2]).countTf.setText("");
+								((EditPanel)selectPanel[2]).subChoose =0;
+								((EditPanel)selectPanel[2]).subChooseName ="";
+
+							}
+						 catch (SQLException e1) {
+							// TODO Auto-generated catch block
+							System.out.println("DB ActionListener 오류");
+							e1.printStackTrace();
+						}
+						int result;
+						
+					}
+			}
+			}); //확인버튼 리스너
+			this.add(edit);
+			this.add(new JScrollPane(countTa));
+			this.setSize(50, 50);
+		}
+	}
+
+	
+	public static void main(String[] args) {
+		new Border();
+	}
+}
